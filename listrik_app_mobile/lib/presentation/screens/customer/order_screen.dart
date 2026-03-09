@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../../data/providers/order_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'map_picker_screen.dart';
 
 class OrderScreen extends ConsumerStatefulWidget {
   final String? serviceType;
@@ -21,6 +25,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   String _installationType = 'Instalasi Baru';
   final _notesController = TextEditingController();
   final _addressController = TextEditingController();
+  
+  String _latitude = '-6.200000';
+  String _longitude = '106.816666';
+  bool _isLocating = false;
   
   int? _selectedPartner;
   int? _selectedLit;
@@ -57,13 +65,83 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     return 'Rp ${price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
   }
 
-  void _nextStep() {
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'Location services are disabled.';
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Location permissions are denied';
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permissions are permanently denied';
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      
+      setState(() {
+        _latitude = position.latitude.toString();
+        _longitude = position.longitude.toString();
+      });
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        String address = "${place.street}, ${place.subLocality}, ${place.locality}, ${place.subAdministrativeArea}, ${place.administrativeArea}";
+        setState(() {
+          _addressController.text = address;
+        });
+      }
+
+      if (mounted) AppSnackbar.showSuccess(context, '📍 Lokasi berhasil didapatkan!');
+    } catch (e) {
+      if (mounted) AppSnackbar.showError(context, 'Gagal mengambil lokasi: $e');
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
+
+  void _nextStep() async {
     if (_currentStep < 4) {
       setState(() => _currentStep++);
     } else {
-      AppSnackbar.showSuccess(context, '✅ Pesanan berhasil dibuat!');
-      // In a real app, this would call the API.
-      context.go('/partner/home'); // Redirecting to partner home for demo purposes, or wherever appropriate
+      try {
+        final powerString = _selectedPower.replaceAll(RegExp(r'[^0-9]'), '');
+        final powerInt = int.tryParse(powerString) ?? 0;
+        
+        await ref.read(orderProvider.notifier).createOrder({
+          'service_type': _selectedType,
+          'partner_id': _selectedPartner,
+          'lit_id': _selectedLit,
+          'address': _addressController.text.isEmpty ? 'Jl. Sudirman No.12' : _addressController.text,
+          'latitude': _latitude,
+          'longitude': _longitude,
+          'installation_type': _installationType,
+          'power_capacity': powerInt,
+          'notes': _notesController.text,
+        });
+
+        if (mounted) {
+          AppSnackbar.showSuccess(context, '✅ Pesanan berhasil dibuat!');
+          context.go('/home');
+        }
+      } catch (e) {
+        if (mounted) {
+          AppSnackbar.showError(context, 'Gagal membuat pesanan: $e');
+        }
+      }
     }
   }
 
@@ -242,6 +320,26 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   }
 
   // --- STEP 1: LOKASI ---
+  Future<void> _openMapPicker() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPickerScreen(
+          initialLat: double.tryParse(_latitude) ?? -6.200000,
+          initialLng: double.tryParse(_longitude) ?? 106.816666,
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _latitude = result['lat'].toString();
+        _longitude = result['lng'].toString();
+        _addressController.text = result['address'];
+      });
+    }
+  }
+
   Widget _buildStep1() {
     return Column(
       children: [
@@ -253,6 +351,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             decoration: InputDecoration(
               hintText: 'Contoh: Jl. Sudirman No.12, Jakarta',
               hintStyle: const TextStyle(color: AppColors.gray400),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.my_location, color: AppColors.blue500),
+                onPressed: _getCurrentLocation,
+              ),
               filled: true,
               fillColor: AppColors.gray50,
               contentPadding: const EdgeInsets.all(12),
@@ -266,16 +368,22 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           title: 'Pin Lokasi di Peta',
           child: Column(
             children: [
-              GestureDetector(
-                onTap: () => AppSnackbar.showInfo(context, '📍 Lokasi terpilih!'),
-                child: Container(
-                  height: 140,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFFE8F5E9), Color(0xFFBBDEFB)]),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.gray200),
-                  ),
+              if (_isLocating)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else
+                GestureDetector(
+                  onTap: _openMapPicker,
+                  child: Container(
+                    height: 140,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFE8F5E9), Color(0xFFBBDEFB)]),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.gray200),
+                    ),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [

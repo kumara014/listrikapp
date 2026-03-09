@@ -21,7 +21,6 @@ class _WorkOrderScreenState extends ConsumerState<WorkOrderScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(orderProvider.notifier).fetchOrders());
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -37,10 +36,37 @@ class _WorkOrderScreenState extends ConsumerState<WorkOrderScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final orderId = int.tryParse(widget.id);
-    final order = ref.watch(orderProvider.notifier).getOrderById(orderId ?? 0);
+    final orderState = ref.watch(orderProvider);
+    
+    OrderModel? order;
+    try {
+      order = orderState.orders.firstWhere((o) => o.id == orderId);
+    } catch (_) {
+      order = null;
+    }
 
     if (order == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      if (orderState.isLoading) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      
+      // If we don't have it and not loading, try to fetch once if we haven't tried
+      return Scaffold(
+        appBar: AppBar(title: const Text('Detail Pesanan')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Pesanan tidak ditemukan'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.read(orderProvider.notifier).fetchOrders(),
+                child: const Text('Muat Ulang'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(

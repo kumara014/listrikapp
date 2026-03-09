@@ -50,6 +50,11 @@ class OrderResource extends Resource
                                 'cancelled' => 'Cancelled',
                             ])
                             ->required(),
+                        Forms\Components\Select::make('partner_id')
+                            ->relationship('partner', 'company_name')
+                            ->searchable()
+                            ->preload()
+                            ->label('Assign Partner'),
                         Forms\Components\TextInput::make('total_price')
                             ->numeric()
                             ->prefix('IDR')

@@ -40,24 +40,34 @@ class OrderModel {
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     return OrderModel(
-      id: json['id'],
-      agendaNumber: json['agenda_number'],
-      customerId: json['customer_id'],
-      partnerId: json['partner_id'],
-      litId: json['lit_id'],
-      serviceType: json['service_type'],
-      status: json['status'],
-      address: json['address'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
-      installationType: json['installation_type'],
-      powerCapacity: json['power_capacity'] is String 
-          ? int.parse(json['power_capacity']) 
-          : json['power_capacity'],
-      totalPrice: double.parse(json['total_price'].toString()),
-      notes: json['notes'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      id: json['id'] as int,
+      agendaNumber: json['agenda_number']?.toString() ?? '',
+      customerId: json['customer_id'] as int,
+      partnerId: (json['partner_id'] is String 
+          ? int.tryParse(json['partner_id']) 
+          : (json['partner_id'] as num?)?.toInt()),
+      litId: (json['lit_id'] is String 
+          ? int.tryParse(json['lit_id']) 
+          : (json['lit_id'] as num?)?.toInt()),
+      serviceType: json['service_type']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      address: json['address']?.toString() ?? '',
+      latitude: json['latitude']?.toString(),
+      longitude: json['longitude']?.toString(),
+      installationType: json['installation_type']?.toString() ?? '',
+      powerCapacity: (json['power_capacity'] is String 
+          ? (int.tryParse(json['power_capacity']) ?? 0)
+          : (json['power_capacity'] as num?)?.toInt() ?? 0),
+      totalPrice: (json['total_price'] is String 
+          ? (double.tryParse(json['total_price']) ?? 0.0)
+          : (json['total_price'] as num?)?.toDouble() ?? 0.0),
+      notes: json['notes']?.toString(),
+      createdAt: json['created_at'] != null 
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 

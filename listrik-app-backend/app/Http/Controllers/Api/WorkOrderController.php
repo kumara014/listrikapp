@@ -18,24 +18,9 @@ class WorkOrderController extends Controller
         $partner = $request->user()->partner;
 
         $orders = Order::where('partner_id', $partner->id)
-            ->with('customer:id,name')
+            ->with(['customer:id,name', 'lit:id,company_name'])
             ->latest()
             ->paginate(10);
-
-        // Customize output as requested
-        $transformedOrders = $orders->getCollection()->map(function ($order) {
-            return [
-                'id' => $order->id,
-                'agenda_number' => $order->agenda_number,
-                'customer_name' => $order->customer->name,
-                'service_type' => $order->service_type,
-                'address' => $order->address,
-                'status' => $order->status,
-                'created_at' => $order->created_at,
-            ];
-        });
-
-        $orders->setCollection($transformedOrders);
 
         return response()->json($orders);
     }

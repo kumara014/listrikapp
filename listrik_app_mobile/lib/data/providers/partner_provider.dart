@@ -81,7 +81,7 @@ class PartnerNotifier extends StateNotifier<PartnerState> {
 
   Future<void> updateWorkOrderStatus(int orderId, String newStatus) async {
     try {
-      await _apiService.put('/partner/orders/$orderId/status', {'status': newStatus});
+      await _apiService.post('/partner/orders/$orderId/status', {'status': newStatus});
     } catch (e) {
       rethrow;
     }

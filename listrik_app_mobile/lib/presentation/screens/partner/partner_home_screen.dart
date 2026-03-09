@@ -27,19 +27,22 @@ class _PartnerHomeScreenState extends ConsumerState<PartnerHomeScreen> {
     super.initState();
     Future.microtask(() {
       ref.read(partnerProvider.notifier).fetchProfile();
-      ref.read(orderProvider.notifier).fetchOrders();
+      ref.read(orderProvider.notifier).fetchOrders(isPartner: true);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final partnerState = ref.watch(partnerProvider);
+    final orderState = ref.watch(orderProvider);
+    
     return Scaffold(
       backgroundColor: AppColors.gray50,
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          _buildHomeContent(),
-          _buildOrdersContent(),
+          _buildHomeContent(partnerState, orderState),
+          _buildOrdersContent(orderState),
           const PartnerProfileScreen(),
         ],
       ),
@@ -48,12 +51,11 @@ class _PartnerHomeScreenState extends ConsumerState<PartnerHomeScreen> {
   }
 
   // --- TAB 0: HOME CONTENT ---
-  Widget _buildHomeContent() {
-    final partnerState = ref.watch(partnerProvider);
-    final allOrders = ref.watch(orderProvider);
+  Widget _buildHomeContent(PartnerState partnerState, OrderState orderState) {
+    final allOrders = orderState.orders;
     final profile = partnerState.profile;
     
-    final myOrders = allOrders.where((o) => o.partnerId == (profile?['id'] ?? 0)).toList();
+    final myOrders = allOrders; // API already filters by partner
     final activeOrders = myOrders.where((o) => ['pending', 'verified', 'in_progress', 'generate'].contains(o.status)).toList();
     final completedOrders = myOrders.where((o) => o.status == 'completed').toList();
 
@@ -64,13 +66,20 @@ class _PartnerHomeScreenState extends ConsumerState<PartnerHomeScreen> {
           child: RefreshIndicator(
             onRefresh: () async {
               await ref.read(partnerProvider.notifier).fetchProfile();
-              await ref.read(orderProvider.notifier).fetchOrders();
+              await ref.read(orderProvider.notifier).fetchOrders(isPartner: true);
             },
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (orderState.error != null) 
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                      child: Text('Error: ${orderState.error}', style: TextStyle(color: Colors.red.shade900, fontSize: 11)),
+                    ),
                   _buildStatsRow(myOrders.length, activeOrders.length, completedOrders.length),
                   const SizedBox(height: 24),
                   _buildSectionHeader('Pesanan Masuk', onSeeAll: () => setState(() => _currentIndex = 1)),
@@ -86,7 +95,10 @@ class _PartnerHomeScreenState extends ConsumerState<PartnerHomeScreen> {
   }
 
   Widget _buildHeader(Map<String, dynamic>? profile) {
-    final balance = (profile?['balance'] as num?)?.toDouble() ?? 0.0;
+    final rawBalance = profile?['balance'];
+    final balance = rawBalance != null 
+        ? double.tryParse(rawBalance.toString()) ?? 0.0 
+        : 0.0;
     
     return Container(
       width: double.infinity,
@@ -241,11 +253,9 @@ class _PartnerHomeScreenState extends ConsumerState<PartnerHomeScreen> {
   }
 
   // --- TAB 1: ORDERS CONTENT ---
-  Widget _buildOrdersContent() {
-    final partnerState = ref.watch(partnerProvider);
-    final allOrders = ref.watch(orderProvider);
-    final profile = partnerState.profile;
-    final myOrders = allOrders.where((o) => o.partnerId == (profile?['id'] ?? 0)).toList();
+  Widget _buildOrdersContent(OrderState orderState) {
+    final allOrders = orderState.orders;
+    final myOrders = allOrders; // API already filters by partner
 
     return DefaultTabController(
       length: 5,
@@ -305,7 +315,7 @@ class _PartnerHomeScreenState extends ConsumerState<PartnerHomeScreen> {
       return const Center(child: Text('Tidak ada pesanan di kategori ini', style: TextStyle(color: AppColors.gray400, fontSize: 12)));
     }
     return RefreshIndicator(
-      onRefresh: () => ref.read(orderProvider.notifier).fetchOrders(),
+      onRefresh: () => ref.read(orderProvider.notifier).fetchOrders(isPartner: true),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: orders.length,

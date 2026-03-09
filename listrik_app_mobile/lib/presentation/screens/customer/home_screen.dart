@@ -43,7 +43,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildHomeContent() {
     final user = ref.watch(authProvider);
-    final orders = ref.watch(orderProvider);
+    final orderState = ref.watch(orderProvider);
+    final orders = orderState.orders;
     final activeOrdersCount = orders.where((o) => o.status != 'completed' && o.status != 'cancelled').length;
 
     return Column(

@@ -16,7 +16,7 @@ class PartnerProfileController extends Controller
         $partner = $request->user()->partner->load('user');
 
         return response()->json([
-            'partner' => $partner
+            'data' => $partner
         ]);
     }
 
@@ -53,7 +53,7 @@ class PartnerProfileController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully',
-            'partner' => $partner->load('user')
+            'data' => $partner->load('user')
         ]);
     }
 }

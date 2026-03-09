@@ -11,7 +11,9 @@ class OrderListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final orders = ref.watch(orderProvider);
+    final orderState = ref.watch(orderProvider);
+    final orders = orderState.orders; // Keep this line as 'orders' is used later
+    final certificates = orderState.orders.where((o) => o.status == 'completed').toList();
 
     return Scaffold(
       backgroundColor: AppColors.gray50,
